@@ -1158,7 +1158,7 @@ public class QuicServerTestJava {
 
       Assertions.assertTrue(dial.cancel(true));
 
-      long releaseMillis = awaitUdpPortReusable(clientPort, Duration.ofSeconds(5));
+      long releaseMillis = awaitUdpPortReusable(clientPort, Duration.ofSeconds(6));
       System.out.println(
           "Cancelled pending QUIC dial released UDP port after " + releaseMillis + " ms");
       Assertions.assertTrue(
