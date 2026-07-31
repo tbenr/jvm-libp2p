@@ -1137,7 +1137,7 @@ public class QuicServerTestJava {
   }
 
   @Test
-  void cancelledPendingDialReleasesUdpSocketWithinQuicConnectTimeout() throws Exception {
+  void cancelledPendingDialPromptlyReleasesUdpSocket() throws Exception {
     Pair<PrivKey, PubKey> clientKeyPair = KeyKt.generateKeyPair(KeyType.ED25519);
     List<io.libp2p.core.multistream.ProtocolBinding<?>> emptyProtocols = new ArrayList<>();
     QuicTransport clientTransport = QuicTransport.ECDSA(clientKeyPair.component1(), emptyProtocols);
@@ -1158,12 +1158,12 @@ public class QuicServerTestJava {
 
       Assertions.assertTrue(dial.cancel(true));
 
-      long releaseMillis = awaitUdpPortReusable(clientPort, Duration.ofSeconds(35));
+      long releaseMillis = awaitUdpPortReusable(clientPort, Duration.ofSeconds(5));
       System.out.println(
           "Cancelled pending QUIC dial released UDP port after " + releaseMillis + " ms");
       Assertions.assertTrue(
-          releaseMillis >= Duration.ofSeconds(25).toMillis(),
-          "expected current cleanup to wait for the approximately 30-second QUIC connect timeout");
+          releaseMillis < Duration.ofSeconds(5).toMillis(),
+          "cancelled pending QUIC dial did not promptly release its UDP socket");
     } finally {
       clientTransport.close().get(5, TimeUnit.SECONDS);
     }
