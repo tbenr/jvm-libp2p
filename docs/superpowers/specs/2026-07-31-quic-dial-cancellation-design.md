@@ -50,21 +50,32 @@ remove it on completion. This would also support transport shutdown cleanup,
 but adds synchronization and lifecycle state for a cancellation path that can
 be handled directly by the existing bind future.
 
-## Regression Test
+## Characterization And Regression Tests
 
-Add a test using a loopback UDP endpoint that receives packets but never
-responds as a QUIC peer:
+Use a loopback UDP endpoint that receives packets but never responds as a QUIC
+peer:
 
 1. Start a datagram socket on loopback.
 2. Dial it with `QuicTransport`.
 3. Receive the first QUIC datagram and record the client's source port. This
    proves the dial socket is bound and the handshake is pending.
 4. Cancel the returned dial future.
-5. Poll briefly until another socket can bind the recorded client port.
+5. Poll until the applicable deadline while trying to bind another socket to
+   the recorded client port.
 
-Before the fix, rebinding fails while the pending UDP channel remains open.
-After the fix, cancellation closes that channel and the port becomes bindable
-without waiting for a protocol timeout.
+Before changing production code, run this as a characterization test with a
+35-second deadline. Record the elapsed release time and confirm that the
+current implementation releases the socket around Netty's 30-second QUIC
+connect timeout. This distinguishes bounded retention from an unbounded leak.
+
+Then tighten the same test to require release within five seconds. It must fail
+against the current implementation because cancellation does not release the
+socket promptly. After the fix, cancellation closes the channel and the port
+becomes bindable within that short deadline.
+
+Only the prompt-release assertion remains in the committed test suite. The
+30-second characterization run is evidence gathered during development, not a
+permanent addition to test duration.
 
 The existing established-connection cancellation test remains useful for the
 post-handshake race and will be retained.
@@ -72,6 +83,8 @@ post-handshake race and will be retained.
 ## Scope And Success Criteria
 
 - Cancelling a pending QUIC dial promptly closes its ephemeral UDP channel.
+- A pre-fix characterization run confirms current retention is bounded at
+  approximately 30 seconds.
 - Cancellation after QUIC establishment remains safe.
 - The new regression test fails against the current implementation and passes
   with the fix.
